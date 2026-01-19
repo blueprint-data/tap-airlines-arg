@@ -1,12 +1,12 @@
 [project]
 name = "tap-airlines"
 version = "0.0.1"
-description = "Singer tap for juanpiRiv, built with the Meltano Singer SDK."
+description = "Singer tap for blueprintdata, built with the Meltano Singer SDK."
 readme = "README.md"
-authors = [{ name = "Juan Pablo Rivero Albornoz", email = "juan.rivero@blueprintdata.xyz" }]
+authors = [{ name = "blueprintdata", email = "juan.rivero@blueprintdata.xyz" }]
 keywords = [
     "ELT",
-    "juanpiRiv",
+    "blueprintdata",
 ]
 classifiers = [
     "Intended Audience :: Developers",
@@ -33,7 +33,7 @@ s3 = [
 
 [project.scripts]
 # CLI declaration
-tap-airlines = 'tap_airlines.tap:TapjuanpiRiv.cli'
+tap-airlines = 'tap_airlines.tap:TapAirlines.cli'
 
 [dependency-groups]
 dev = [

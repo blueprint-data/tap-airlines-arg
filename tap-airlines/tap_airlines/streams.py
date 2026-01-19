@@ -2,60 +2,93 @@
 
 from __future__ import annotations
 
-from singer_sdk import typing as th  # JSON Schema typing helpers
+from datetime import datetime, timedelta
+from typing import Any
 
-from tap_airlines.client import juanpiRivStream
+from singer_sdk import SchemaDirectory, StreamSchema
+from singer_sdk.helpers.types import Context
+from tap_airlines import schemas
 
-# TODO: - Override `UsersStream` and `GroupsStream` with your own stream definition.
-#       - Copy-paste as many times as needed to create multiple stream types.
+from tap_airlines.client import BlueprintdataStream
+from tap_airlines.utils import utc_now_iso
+
+SCHEMAS_DIR = SchemaDirectory(schemas)
 
 
-class UsersStream(juanpiRivStream):
-    """Define custom stream."""
+class AerolineasAllFlightsStream(BlueprintdataStream):
+    """Vuelos (arrivals/departures) desde /all-flights."""
 
-    name = "users"
-    path = "/users"
+    name = "aerolineas_all_flights"
+    path = "/all-flights"
     primary_keys = ("id",)
     replication_key = None
-    # Optionally, you may also use `schema_filepath` in place of `schema`:
-    # schema_filepath = SCHEMAS_DIR / "users.json"  # noqa: ERA001
-    schema = th.PropertiesList(
-        th.Property("name", th.StringType),
-        th.Property(
-            "id",
-            th.StringType,
-            description="The user's system ID",
-        ),
-        th.Property(
-            "age",
-            th.IntegerType,
-            description="The user's age in years",
-        ),
-        th.Property(
-            "email",
-            th.StringType,
-            description="The user's email address",
-        ),
-        th.Property("street", th.StringType),
-        th.Property("city", th.StringType),
-        th.Property(
-            "state",
-            th.StringType,
-            description="State name in ISO 3166-2 format",
-        ),
-        th.Property("zip", th.StringType),
-    ).to_dict()
 
+    # La API devuelve una lista, así que la base (client) debe parsear bien la respuesta.
+    # Schema mínimo (después lo completamos con campos reales)
+    schema = StreamSchema(SCHEMAS_DIR, key="aerolineas_all_flights")
 
-class GroupsStream(juanpiRivStream):
-    """Define custom stream."""
+    _partitions: list[dict[str, Any]] | None = None
 
-    name = "groups"
-    path = "/groups"
-    primary_keys = ("id",)
-    replication_key = "modified"
-    schema = th.PropertiesList(
-        th.Property("name", th.StringType),
-        th.Property("id", th.StringType),
-        th.Property("modified", th.DateTimeType),
-    ).to_dict()
+    @property
+    def partitions(self) -> list[dict[str, Any]]:
+        """Generate contexts for (airport, movtp, date)."""
+        if self._partitions is None:
+            self._partitions = self._build_partitions()
+        return self._partitions
+
+    def _build_partitions(self) -> list[dict[str, Any]]:
+        partitions: list[dict[str, Any]] = []
+        today = datetime.utcnow().date()
+        for airport_iata in self.airports:
+            for movtp in ("A", "D"):
+                for offset in range(0, self.days_back + 1):
+                    date_value = today - timedelta(days=offset)
+                    partitions.append(
+                        {
+                            "airport_iata": airport_iata,
+                            "movtp": movtp,
+                            "date": date_value.isoformat(),
+                        },
+                    )
+        return partitions
+
+    def get_url_params(self, context: Context | None, next_page_token: Any | None):
+        """Build request params for each context."""
+        context = context or {}
+        airport = context.get("airport_iata")
+        movtp = context.get("movtp")
+        date_iso = context.get("date")
+
+        try:
+            date_obj = datetime.fromisoformat(date_iso).date()
+        except Exception as exc:  # noqa: BLE001
+            msg = f"Context date must be ISO format, got {date_iso!r}"
+            raise ValueError(msg) from exc
+
+        formatted_date = date_obj.strftime("%d-%m-%Y")
+        context.setdefault("fetched_at", utc_now_iso())
+
+        self.logger.info(
+            "Requesting flights",
+            extra={
+                "airport": airport,
+                "movtp": movtp,
+                "date": date_iso,
+            },
+        )
+
+        return {
+            "c": "900",
+            "idarpt": airport,
+            "movtp": movtp,
+            "f": formatted_date,
+        }
+
+    def post_process(self, row: dict, context: Context | None = None):
+        """Attach metadata to each record."""
+        context = context or {}
+        row["x_fetched_at"] = context.get("fetched_at") or utc_now_iso()
+        row["x_airport_iata"] = context.get("airport_iata")
+        row["x_movtp"] = context.get("movtp")
+        row["x_date"] = context.get("date")
+        return row

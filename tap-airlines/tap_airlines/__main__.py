@@ -1,7 +1,7 @@
-"""juanpiRiv entry point."""
+"""tap-airlines entry point."""
 
 from __future__ import annotations
 
-from tap_airlines.tap import TapjuanpiRiv
+from tap_airlines.tap import TapAirlines
 
-TapjuanpiRiv.cli()
+TapAirlines.cli()
