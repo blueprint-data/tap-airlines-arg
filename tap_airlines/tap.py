@@ -109,7 +109,7 @@ class TapAirlines(Tap):
             streams.AerolineasAllFlightsStream(self),
         ]
 
-    def run_connection_test(self) -> bool:
+    def run_connection_test(self) -> bool:  # type: ignore[misc]
         """Override to avoid aborting after 1 record during `--test=records`."""
         return self.run_sync_dry_run(dry_run_record_limit=None, streams=self.streams.values())
 

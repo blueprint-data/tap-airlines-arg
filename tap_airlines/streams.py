@@ -54,10 +54,14 @@ class AerolineasAllFlightsStream(BlueprintdataStream):
 
     def get_url_params(self, context: Context | None, next_page_token: Any | None):
         """Build request params for each context."""
-        context = context or {}
-        airport = context.get("airport_iata")
-        movtp = context.get("movtp")
-        date_iso = context.get("date")
+        base_ctx: dict[str, Any] = context if isinstance(context, dict) else dict(context or {})
+        airport = base_ctx.get("airport_iata")
+        movtp = base_ctx.get("movtp")
+        date_iso = base_ctx.get("date")
+
+        if not isinstance(date_iso, str):
+            msg = f"Context date must be ISO format string, got {date_iso!r}"
+            raise ValueError(msg)
 
         try:
             date_obj = datetime.fromisoformat(date_iso).date()
@@ -66,7 +70,7 @@ class AerolineasAllFlightsStream(BlueprintdataStream):
             raise ValueError(msg) from exc
 
         formatted_date = date_obj.strftime("%d-%m-%Y")
-        context.setdefault("fetched_at", utc_now_iso())
+        base_ctx.setdefault("fetched_at", utc_now_iso())
 
         self.logger.info(
             "Requesting flights",

@@ -28,8 +28,9 @@ else:
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    import requests
+    import requests  # type: ignore[import-untyped]
     from singer_sdk.helpers.types import Context
+    from tap_airlines.tap import TapAirlines
 
 
 class BlueprintdataStream(RESTStream):
@@ -42,8 +43,8 @@ class BlueprintdataStream(RESTStream):
     def airports(self) -> list[str]:
         """Airports parsed from config."""
         tap = getattr(self, "_tap", None)
-        if tap and hasattr(tap, "airports"):
-            return list(tap.airports)  # type: ignore[attr-defined]
+        if tap and "TapAirlines" in globals() and isinstance(tap, TapAirlines):
+            return list(tap.airports)
         return require_airports(self.config.get("airports"))
 
     @cached_property
@@ -55,8 +56,8 @@ class BlueprintdataStream(RESTStream):
     def language(self) -> str:
         """Language header value."""
         tap = getattr(self, "_tap", None)
-        if tap and hasattr(tap, "language"):
-            return str(tap.language)  # type: ignore[attr-defined]
+        if tap and "TapAirlines" in globals() and isinstance(tap, TapAirlines):
+            return str(tap.language)
         return coerce_language(self.config.get("language"))
 
     @cached_property

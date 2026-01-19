@@ -37,7 +37,7 @@ def _fake_request_records(self, context):
     yield {key: enriched.get(key) for key in allowed_keys}
 
 
-rest_stream.RESTStream.request_records = _fake_request_records
+rest_stream.RESTStream.request_records = _fake_request_records  # type: ignore[method-assign]
 
 SAMPLE_CONFIG = {
     "api_url": "https://example.com/api",
