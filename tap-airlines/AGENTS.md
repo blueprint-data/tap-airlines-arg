@@ -5,14 +5,14 @@ This document provides guidance for AI coding agents and developers working on t
 ## Project Overview
 
 - **Project Type**: Singer Tap
-- **Source**: juanpiRiv
+- **Source**: blueprintdata
 - **Stream Type**: REST
 - **Authentication**: API Key
 - **Framework**: Meltano Singer SDK
 
 ## Architecture
 
-This tap follows the Singer specification and uses the Meltano Singer SDK to extract data from juanpiRiv.
+This tap follows the Singer specification and uses the Meltano Singer SDK to extract data from blueprintdata.
 
 ### Key Components
 
@@ -43,7 +43,7 @@ Before making changes, ensure you understand these Singer concepts:
 Example:
 
 ```python
-class MyNewStream(juanpiRivStream):
+class MyNewStream(BlueprintdataStream):
     name = "my_new_stream"
     path = "/api/v1/my_resource"
     primary_keys = ["id"]
@@ -72,7 +72,7 @@ The SDK provides built-in pagination classes. **Use these instead of overriding 
    ```python
    from singer_sdk.pagination import SimpleHeaderPaginator
 
-   class MyStream(juanpiRivStream):
+   class MyStream(BlueprintdataStream):
        def get_new_paginator(self):
            return SimpleHeaderPaginator()
    ```
@@ -82,7 +82,7 @@ The SDK provides built-in pagination classes. **Use these instead of overriding 
    ```python
    from singer_sdk.pagination import HeaderLinkPaginator
 
-   class MyStream(juanpiRivStream):
+   class MyStream(BlueprintdataStream):
        def get_new_paginator(self):
            return HeaderLinkPaginator()
    ```
@@ -92,7 +92,7 @@ The SDK provides built-in pagination classes. **Use these instead of overriding 
    ```python
    from singer_sdk.pagination import JSONPathPaginator
 
-   class MyStream(juanpiRivStream):
+   class MyStream(BlueprintdataStream):
        def get_new_paginator(self):
            return JSONPathPaginator("$.pagination.next_token")
    ```
@@ -102,7 +102,7 @@ The SDK provides built-in pagination classes. **Use these instead of overriding 
    ```python
    from singer_sdk.pagination import SinglePagePaginator
 
-   class MyStream(juanpiRivStream):
+   class MyStream(BlueprintdataStream):
        def get_new_paginator(self):
            return SinglePagePaginator()
    ```
@@ -128,7 +128,7 @@ class MyCustomPaginator(BasePageNumberPaginator):
         return None
 
 # Use in stream
-class MyStream(juanpiRivStream):
+class MyStream(BlueprintdataStream):
     def get_new_paginator(self):
         return MyCustomPaginator(start_value=1)
 ```

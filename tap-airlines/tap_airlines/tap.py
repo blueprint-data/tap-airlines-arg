@@ -1,14 +1,20 @@
-"""juanpiRiv tap class."""
+"""tap-airlines tap class (Aerolíneas / Aeropuertos Argentina)."""
 
 from __future__ import annotations
 
 import sys
+from typing import Any
 
 from singer_sdk import Tap
 from singer_sdk import typing as th  # JSON schema typing helpers
 
-# TODO: Import your custom stream types here:
 from tap_airlines import streams
+from tap_airlines.utils import (
+    DEFAULT_LANGUAGE,
+    DEFAULT_ORIGIN,
+    DEFAULT_USER_AGENT,
+    require_airports,
+)
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -16,62 +22,97 @@ else:
     from typing_extensions import override
 
 
-class TapjuanpiRiv(Tap):
-    """Singer tap for juanpiRiv."""
+class TapAirlines(Tap):
+    """Singer tap para extraer vuelos desde el endpoint /all-flights."""
 
     name = "tap-airlines"
 
-    # TODO: Update this section with the actual config values you expect:
+    # Config esperada (mapea a env vars TAP_AIRLINES_*)
     config_jsonschema = th.PropertiesList(
-        th.Property(
-            "auth_token",
-            th.StringType(nullable=False),
-            required=True,
-            secret=True,  # Flag config as protected.
-            title="Auth Token",
-            description="The token to authenticate against the API service",
-        ),
-        th.Property(
-            "project_ids",
-            th.ArrayType(th.StringType(nullable=False), nullable=False),
-            required=True,
-            title="Project IDs",
-            description="Project IDs to replicate",
-        ),
-        th.Property(
-            "start_date",
-            th.DateTimeType(nullable=True),
-            description="The earliest record date to sync",
-        ),
         th.Property(
             "api_url",
             th.StringType(nullable=False),
+            required=True,
             title="API URL",
-            default="https://api.mysample.com",
-            description="The url for the API service",
+            default="https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa",
+            description="Base URL del API (sin /all-flights).",
+        ),
+        th.Property(
+            "api_key",
+            th.StringType(nullable=False),
+            required=True,
+            secret=True,
+            title="API Key",
+            description="Valor del header 'Key' requerido por el endpoint.",
+        ),
+        th.Property(
+            "origin",
+            th.StringType(nullable=True),
+            required=False,
+            title="Origin",
+            default=DEFAULT_ORIGIN,
+            description="Valor del header Origin.",
+        ),
+        th.Property(
+            "airports",
+            th.ArrayType(th.StringType(nullable=False), nullable=False),
+            required=True,
+            title="Airports (IATA)",
+            description="Lista de aeropuertos IATA a consultar. Ej: ['AEP','EZE']",
+        ),
+        th.Property(
+            "days_back",
+            th.IntegerType(nullable=True),
+            required=False,
+            default=1,
+            title="Days Back",
+            description="Cuántos días hacia atrás consultar (1 = hoy y ayer).",
         ),
         th.Property(
             "user_agent",
             th.StringType(nullable=True),
-            description=(
-                "A custom User-Agent header to send with each request. Default is "
-                "'<tap_name>/<tap_version>'"
-            ),
+            required=False,
+            default=DEFAULT_USER_AGENT,
+            title="User Agent",
+            description="User-Agent para enviar en requests.",
+        ),
+        th.Property(
+            "language",
+            th.StringType(nullable=True),
+            required=False,
+            default=DEFAULT_LANGUAGE,
+            title="Language",
+            description="Header Accept-Language (default es-AR).",
         ),
     ).to_dict()
 
-    @override
-    def discover_streams(self) -> list[streams.juanpiRivStream]:
-        """Return a list of discovered streams.
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the tap and normalize config."""
+        super().__init__(*args, **kwargs)
+        self._airports = require_airports(self.config.get("airports"))
+        self._language = str(self.config.get("language") or DEFAULT_LANGUAGE)
 
-        Returns:
-            A list of discovered streams.
-        """
+    @property
+    def airports(self) -> list[str]:
+        """Normalized airports list."""
+        return self._airports
+
+    @property
+    def language(self) -> str:
+        """Preferred language header."""
+        return self._language
+
+    @override
+    def discover_streams(self) -> list[streams.AerolineasAllFlightsStream]:
+        """Return a list of discovered streams."""
         return [
-            streams.GroupsStream(self),
-            streams.UsersStream(self),
+            streams.AerolineasAllFlightsStream(self),
         ]
+
+    def run_connection_test(self) -> bool:
+        """Override to avoid aborting after 1 record during `--test=records`."""
+        return self.run_sync_dry_run(dry_run_record_limit=None, streams=self.streams.values())
 
 
 if __name__ == "__main__":
-    TapjuanpiRiv.cli()
+    TapAirlines.cli()

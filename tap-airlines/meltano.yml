@@ -1,14 +1,19 @@
 send_anonymous_usage_stats: true
-project_id: "tap-airlines"
-default_environment: test
-requires_meltano: ">=4.0"
+project_id: tap-airlines
+requires_meltano: '>=4.0'
+
+default_environment: dev
+
 environments:
-- name: test
+- name: dev
+- name: prod
+
 plugins:
   extractors:
-  - name: "tap-airlines"
-    namespace: "tap_airlines"
+  - name: tap-airlines
+    namespace: tap_airlines
     pip_url: -e .
+    executable: tap-airlines
     capabilities:
     - state
     - catalog
@@ -17,31 +22,51 @@ plugins:
     - stream-maps
     - structured-logging
 
-    # TODO: Declare settings and their types here:
     settings:
-    - name: username
-      label: Username
-      description: The username to use for authentication
+    - name: api_url
+      kind: string
+      label: API URL
+      description: Base URL del API (sin /all-flights).
 
-    - name: password
-      kind: password
-      label: Password
-      description: The password to use for authentication
+    - name: api_key
+      kind: string
+      label: API Key
+      description: Valor del header 'Key'.
       sensitive: true
 
-    - name: start_date
-      kind: date_iso8601
-      label: Start Date
-      description: Initial date to start extracting data from
+    - name: origin
+      kind: string
+      label: Origin
+      description: Header Origin para el request.
 
-    # TODO: Declare required settings here:
-    settings_group_validation:
-    - [username, password]
+    - name: language
+      kind: string
+      label: Accept-Language
+      description: Header Accept-Language (default es-AR).
 
-    # TODO: Declare default configuration values here:
+    - name: airports
+      kind: array
+      label: Airports (IATA)
+      description: Lista de aeropuertos IATA, ej ["AEP","EZE"].
+
+    - name: days_back
+      kind: integer
+      label: Days Back
+      description: Cuántos días hacia atrás consultar (1 = hoy + ayer).
+
+    - name: user_agent
+      kind: string
+      label: User Agent
+      description: Header User-Agent.
+
+      # Defaults no-sensibles (OK en git)
     config:
-      start_date: '2010-01-01T00:00:00Z'
-
+      api_url: https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa
+      origin: https://www.aeropuertosargentina.com
+      language: es-AR
+      airports: [AEP, EZE]
+      days_back: 1
+      user_agent: Mozilla/5.0
   loaders:
   - name: target-jsonl
     variant: andyh1203

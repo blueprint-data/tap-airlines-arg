@@ -1,18 +1,24 @@
-"""REST client handling, including juanpiRivStream base class."""
+"""REST client handling, including BlueprintdataStream base class."""
 
 from __future__ import annotations
 
 import decimal
 import sys
-from typing import TYPE_CHECKING, Any, ClassVar
+from functools import cached_property
+from typing import TYPE_CHECKING, Any
 
-from singer_sdk import SchemaDirectory, StreamSchema
 from singer_sdk.authenticators import APIKeyAuthenticator
 from singer_sdk.helpers.jsonpath import extract_jsonpath
-from singer_sdk.pagination import BaseAPIPaginator  # noqa: TC002
 from singer_sdk.streams import RESTStream
 
-from tap_airlines import schemas
+from tap_airlines.utils import (
+    DEFAULT_LANGUAGE,
+    DEFAULT_ORIGIN,
+    DEFAULT_USER_AGENT,
+    coerce_language,
+    coerce_days_back,
+    require_airports,
+)
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -26,147 +32,78 @@ if TYPE_CHECKING:
     from singer_sdk.helpers.types import Context
 
 
-# TODO: Delete this is if not using json files for schema definition
-SCHEMAS_DIR = SchemaDirectory(schemas)
+class BlueprintdataStream(RESTStream):
+    """Base stream para Aeropuertos Argentina (all-flights)."""
 
-
-class juanpiRivStream(RESTStream):
-    """juanpiRiv stream class."""
-
-    # Update this value if necessary or override `parse_response`.
     records_jsonpath = "$[*]"
+    extra_retry_statuses = (429, 500, 502, 503, 504)
 
-    # Update this value if necessary or override `get_new_paginator`.
-    next_page_token_jsonpath = "$.next_page"  # noqa: S105
+    @cached_property
+    def airports(self) -> list[str]:
+        """Airports parsed from config."""
+        tap = getattr(self, "_tap", None)
+        if tap and hasattr(tap, "airports"):
+            return list(tap.airports)  # type: ignore[attr-defined]
+        return require_airports(self.config.get("airports"))
 
-    schema: ClassVar[StreamSchema] = StreamSchema(SCHEMAS_DIR)
+    @cached_property
+    def days_back(self) -> int:
+        """Non-negative days_back value."""
+        return coerce_days_back(self.config.get("days_back"))
+
+    @cached_property
+    def language(self) -> str:
+        """Language header value."""
+        tap = getattr(self, "_tap", None)
+        if tap and hasattr(tap, "language"):
+            return str(tap.language)  # type: ignore[attr-defined]
+        return coerce_language(self.config.get("language"))
+
+    @cached_property
+    def origin(self) -> str:
+        """Origin header value."""
+        return str(self.config.get("origin") or DEFAULT_ORIGIN)
+
+    @cached_property
+    def user_agent(self) -> str:
+        """User-Agent header value."""
+        return str(self.config.get("user_agent") or DEFAULT_USER_AGENT)
 
     @override
     @property
     def url_base(self) -> str:
         """Return the API URL root, configurable via tap settings."""
-        # TODO: hardcode a value here, or retrieve it from self.config
-        return "https://api.mysample.com"
+        return self.config["api_url"].rstrip("/")
 
     @override
     @property
     def authenticator(self) -> APIKeyAuthenticator:
-        """Return a new authenticator object.
-
-        Returns:
-            An authenticator instance.
-        """
+        """Return API key authenticator (header Key: <api_key>)."""
         return APIKeyAuthenticator(
-            key="x-api-key",
-            value=self.config.get("auth_token", ""),
+            key="Key",
+            value=self.config["api_key"],
             location="header",
         )
 
+    @override
     @property
-    @override
-    def http_headers(self) -> dict:
-        """Return the http headers needed.
-
-        Returns:
-            A dictionary of HTTP headers.
-        """
-        # If not using an authenticator, you may also provide inline auth headers:
-        # headers["Private-Token"] = self.config.get("auth_token")  # noqa: ERA001
-        return {}
+    def http_headers(self) -> dict[str, str]:
+        """Headers requeridos por el endpoint."""
+        return {
+            "Origin": self.origin,
+            "User-Agent": self.user_agent,
+            "Accept-Language": self.language or DEFAULT_LANGUAGE,
+        }
 
     @override
-    def get_new_paginator(self) -> BaseAPIPaginator | None:
-        """Create a new pagination helper instance.
-
-        If the source API can make use of the `next_page_token_jsonpath`
-        attribute, or it contains a `X-Next-Page` header in the response
-        then you can remove this method.
-
-        If you need custom pagination that uses page numbers, "next" links, or
-        other approaches, please read the guide: https://sdk.meltano.com/en/v0.25.0/guides/pagination-classes.html.
-
-        Returns:
-            A pagination helper instance, or ``None`` to indicate pagination
-            is not supported.
-        """
-        return super().get_new_paginator()
-
-    @override
-    def get_url_params(
-        self,
-        context: Context | None,
-        next_page_token: Any | None,
-    ) -> dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization.
-
-        Args:
-            context: The stream context.
-            next_page_token: The next page index or value.
-
-        Returns:
-            A dictionary of URL query parameters.
-        """
-        params: dict = {}
-        if next_page_token:
-            params["page"] = next_page_token
-        if self.replication_key:
-            params["sort"] = "asc"
-            params["order_by"] = self.replication_key
-        return params
-
-    @override
-    def prepare_request_payload(
-        self,
-        context: Context | None,
-        next_page_token: Any | None,
-    ) -> dict | None:
-        """Prepare the data payload for the REST API request.
-
-        By default, no payload will be sent (return None).
-
-        Args:
-            context: The stream context.
-            next_page_token: The next page index or value.
-
-        Returns:
-            A dictionary with the JSON body for a POST requests.
-        """
-        # TODO: Delete this method if no payload is required. (Most REST APIs.)
+    def get_new_paginator(self) -> None:
+        """Sin paginación para este endpoint."""
         return None
 
     @override
     def parse_response(self, response: requests.Response) -> Iterable[dict]:
-        """Parse the response and return an iterator of result records.
-
-        Args:
-            response: The HTTP ``requests.Response`` object.
-
-        Yields:
-            Each record from the source.
-        """
-        # TODO: Parse response body and return a set of records.
+        """Parsea la respuesta JSON (lista)."""
         yield from extract_jsonpath(
             self.records_jsonpath,
             input=response.json(parse_float=decimal.Decimal),
         )
-
-    @override
-    def post_process(
-        self,
-        row: dict,
-        context: Context | None = None,
-    ) -> dict | None:
-        """As needed, append or transform raw data to match expected structure.
-
-        Note: As of SDK v0.47.0, this method is automatically executed for all stream types.
-        You should not need to call this method directly in custom `get_records` implementations.
-
-        Args:
-            row: An individual record from the stream.
-            context: The stream context.
-
-        Returns:
-            The updated record dictionary, or ``None`` to skip the record.
-        """
-        # TODO: Delete this method if not needed.
-        return row
