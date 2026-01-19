@@ -6,19 +6,7 @@ name: Test tap-airlines
 on:
   push:
     branches: [main]
-    paths:
-    - .github/workflows/test.yml
-    - tap_airlines/**
-    - tests/**
-    - pyproject.toml
-    - uv.lock
   pull_request:
-    paths:
-    - .github/workflows/test.yml
-    - tap_airlines/**
-    - tests/**
-    - pyproject.toml
-    - uv.lock
   workflow_dispatch:
 
 concurrency:
