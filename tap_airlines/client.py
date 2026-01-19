@@ -28,7 +28,7 @@ else:
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    import requests  # type: ignore[import-untyped]
+    import requests
     from singer_sdk.helpers.types import Context
     from tap_airlines.tap import TapAirlines
 
