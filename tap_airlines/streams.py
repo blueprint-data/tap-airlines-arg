@@ -56,8 +56,10 @@ class AerolineasAllFlightsStream(BlueprintdataStream):
         """Build request params for each context."""
         if isinstance(context, dict):
             ctx: dict[str, Any] = context
+        elif context is not None:
+            ctx = dict(context)
         else:
-            ctx = dict(cast(Mapping[str, Any], context)) if context else {}
+            ctx = {}
 
         airport = ctx.get("airport_iata")
         movtp = ctx.get("movtp")
