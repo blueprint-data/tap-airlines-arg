@@ -12,6 +12,7 @@ from singer_sdk.helpers.jsonpath import extract_jsonpath
 from singer_sdk.streams import RESTStream
 
 from tap_airlines.utils import (
+    DEFAULT_AIRPORTS,
     DEFAULT_LANGUAGE,
     DEFAULT_ORIGIN,
     DEFAULT_USER_AGENT,
@@ -45,7 +46,7 @@ class BlueprintdataStream(RESTStream):
         tap = getattr(self, "_tap", None)
         if tap and "TapAirlines" in globals() and isinstance(tap, TapAirlines):
             return list(tap.airports)
-        return require_airports(self.config.get("airports"))
+        return require_airports(self.config.get("airports"), default=DEFAULT_AIRPORTS)
 
     @cached_property
     def days_back(self) -> int:

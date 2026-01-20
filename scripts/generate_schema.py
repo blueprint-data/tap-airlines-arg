@@ -12,6 +12,9 @@ from pathlib import Path
 import requests
 
 from tap_airlines.utils import (
+    DEFAULT_AIRPORTS,
+    DEFAULT_API_KEY,
+    DEFAULT_API_URL,
     DEFAULT_LANGUAGE,
     DEFAULT_ORIGIN,
     DEFAULT_USER_AGENT,
@@ -26,8 +29,8 @@ SCHEMA_PATH = (
 )
 
 
-def _required_env(name: str) -> str:
-    value = os.getenv(name)
+def _required_env(name: str, fallback: str | None = None) -> str:
+    value = os.getenv(name) or fallback
     if not value:
         sys.exit(f"Missing required environment variable: {name}")
     return value
@@ -53,10 +56,10 @@ def _coerce_date(raw_date: str | None) -> datetime.date:
 
 
 def main() -> None:
-    api_url = _required_env("TAP_AIRLINES_API_URL").rstrip("/")
-    api_key = _required_env("TAP_AIRLINES_API_KEY")
+    api_url = _required_env("TAP_AIRLINES_API_URL", DEFAULT_API_URL).rstrip("/")
+    api_key = _required_env("TAP_AIRLINES_API_KEY", DEFAULT_API_KEY)
 
-    airports = parse_airports(os.getenv("TAP_AIRLINES_AIRPORTS"))
+    airports = parse_airports(os.getenv("TAP_AIRLINES_AIRPORTS") or DEFAULT_AIRPORTS)
     if not airports:
         sys.exit('Set TAP_AIRLINES_AIRPORTS as a JSON array, e.g. ["AEP","EZE"].')
 

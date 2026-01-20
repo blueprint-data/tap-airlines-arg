@@ -1,14 +1,18 @@
-"""Utility helpers for tap-airlines."""
+"""Utility helpers for tap-airlines-arg."""
 
 from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Iterable
 
+DEFAULT_API_URL = "https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa"
+DEFAULT_API_KEY = "HieGcY2nFreIsNLuo5EbXCwE7g0aRzTN"
 DEFAULT_ORIGIN = "https://www.aeropuertosargentina.com"
 DEFAULT_USER_AGENT = "Mozilla/5.0"
 DEFAULT_LANGUAGE = "es-AR"
+DEFAULT_AIRPORTS = ["AEP", "EZE"]
+DEFAULT_DAYS_BACK = 1
 
 
 def parse_airports(raw: Any) -> list[str]:
@@ -36,9 +40,11 @@ def parse_airports(raw: Any) -> list[str]:
     return airports
 
 
-def require_airports(raw: Any) -> list[str]:
+def require_airports(raw: Any, default: Iterable[str] | None = None) -> list[str]:
     """Return parsed airports or raise a helpful error."""
     airports = parse_airports(raw)
+    if not airports and default:
+        airports = parse_airports(default)
     if not airports:
         msg = (
             "Config 'airports' must be a JSON array of IATA codes "
@@ -48,7 +54,7 @@ def require_airports(raw: Any) -> list[str]:
     return airports
 
 
-def coerce_days_back(raw: Any, default: int = 1) -> int:
+def coerce_days_back(raw: Any, default: int = DEFAULT_DAYS_BACK) -> int:
     """Parse days_back into a non-negative integer."""
     try:
         value = int(raw)

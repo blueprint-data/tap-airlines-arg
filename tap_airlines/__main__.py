@@ -1,4 +1,4 @@
-"""tap-airlines entry point."""
+"""tap-airlines-arg entry point."""
 
 from __future__ import annotations
 

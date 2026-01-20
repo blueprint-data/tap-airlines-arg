@@ -1,4 +1,4 @@
-"""tap-airlines tap class (Aerolíneas / Aeropuertos Argentina)."""
+"""tap-airlines-arg tap class (Aerolíneas / Aeropuertos Argentina)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,10 @@ from singer_sdk import typing as th  # JSON schema typing helpers
 
 from tap_airlines import streams
 from tap_airlines.utils import (
+    DEFAULT_AIRPORTS,
+    DEFAULT_API_KEY,
+    DEFAULT_API_URL,
+    DEFAULT_DAYS_BACK,
     DEFAULT_LANGUAGE,
     DEFAULT_ORIGIN,
     DEFAULT_USER_AGENT,
@@ -25,7 +29,16 @@ else:
 class TapAirlines(Tap):
     """Singer tap para extraer vuelos desde el endpoint /all-flights."""
 
-    name = "tap-airlines"
+    name = "tap-airlines-arg"
+    default_config = {
+        "api_url": DEFAULT_API_URL,
+        "api_key": DEFAULT_API_KEY,
+        "origin": DEFAULT_ORIGIN,
+        "airports": DEFAULT_AIRPORTS,
+        "days_back": DEFAULT_DAYS_BACK,
+        "user_agent": DEFAULT_USER_AGENT,
+        "language": DEFAULT_LANGUAGE,
+    }
 
     # Config esperada (mapea a env vars TAP_AIRLINES_*)
     config_jsonschema = th.PropertiesList(
@@ -34,7 +47,7 @@ class TapAirlines(Tap):
             th.StringType(nullable=False),
             required=True,
             title="API URL",
-            default="https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa",
+            default=DEFAULT_API_URL,
             description="Base URL del API (sin /all-flights).",
         ),
         th.Property(
@@ -43,6 +56,7 @@ class TapAirlines(Tap):
             required=True,
             secret=True,
             title="API Key",
+            default=DEFAULT_API_KEY,
             description="Valor del header 'Key' requerido por el endpoint.",
         ),
         th.Property(
@@ -58,13 +72,14 @@ class TapAirlines(Tap):
             th.ArrayType(th.StringType(nullable=False), nullable=False),
             required=True,
             title="Airports (IATA)",
+            default=DEFAULT_AIRPORTS,
             description="Lista de aeropuertos IATA a consultar. Ej: ['AEP','EZE']",
         ),
         th.Property(
             "days_back",
             th.IntegerType(nullable=True),
             required=False,
-            default=1,
+            default=DEFAULT_DAYS_BACK,
             title="Days Back",
             description="Cuántos días hacia atrás consultar (1 = hoy y ayer).",
         ),
@@ -89,7 +104,12 @@ class TapAirlines(Tap):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the tap and normalize config."""
         super().__init__(*args, **kwargs)
-        self._airports = require_airports(self.config.get("airports"))
+        merged_config = {**self.default_config, **dict(self.config)}
+        self._config = merged_config
+        self._airports = require_airports(
+            self.config.get("airports"),
+            default=DEFAULT_AIRPORTS,
+        )
         self._language = str(self.config.get("language") or DEFAULT_LANGUAGE)
 
     @property

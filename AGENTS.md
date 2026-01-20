@@ -1,4 +1,4 @@
-# AGENTS.md - AI Agent Development Guide for tap-airlines
+# AGENTS.md - AI Agent Development Guide for tap-airlines-arg
 
 This document provides guidance for AI coding agents and developers working on this Singer tap.
 
@@ -197,8 +197,8 @@ config_jsonschema = th.PropertiesList(
 Example test with config:
 
 ```bash
-tap-airlines --config config.json --discover
-tap-airlines --config config.json --catalog catalog.json
+tap-airlines-arg --config config.json --discover
+tap-airlines-arg --config config.json --catalog catalog.json
 ```
 
 ### Common Pitfalls
@@ -230,7 +230,7 @@ tap-airlines --config config.json --catalog catalog.json
 ## File Structure
 
 ```
-tap-airlines/
+tap-airlines-arg/
 ├── tap_airlines/
 │   ├── __init__.py
 │   ├── tap.py          # Main tap class
