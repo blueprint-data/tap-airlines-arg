@@ -1,7 +1,5 @@
 # tap-airlines-arg
 
-[![CI](https://github.com/blueprintdata/tap-airlines-arg/actions/workflows/test.yml/badge.svg)](https://github.com/blueprintdata/tap-airlines-arg/actions/workflows/test.yml)
-[![Build](https://github.com/blueprintdata/tap-airlines-arg/actions/workflows/build.yml/badge.svg)](https://github.com/blueprintdata/tap-airlines-arg/actions/workflows/build.yml)
 [![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12-blue)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
