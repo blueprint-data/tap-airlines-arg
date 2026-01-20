@@ -1,6 +1,6 @@
 [project]
 name = "tap-airlines-arg"
-version = "1.0.0"
+version = "1.0.1"
 description = "Singer tap for blueprintdata, built with the Meltano Singer SDK."
 readme = "README.md"
 authors = [{ name = "blueprintdata", email = "juan.rivero@blueprintdata.xyz" }]
