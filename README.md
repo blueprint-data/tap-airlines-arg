@@ -1,117 +1,98 @@
 # tap-airlines-arg
 
-Singer tap (Meltano Singer SDK) for blueprintdata that pulls flight information from `/all-flights`.
+[![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12-blue)](#)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+Singer tap (Meltano Singer SDK) that pulls Argentina Airports `/all-flights` data and emits JSON records ready for any Singer target.
+
+<details>
+<summary>Table of contents</summary>
+
+- [What it does](#what-it-does)
+- [Quickstart](#quickstart)
+- [Configuration](#configuration)
+- [Use cases](#use-cases)
+- [Data schema](#data-schema)
+- [Performance](#performance)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+
+</details>
 
 ## What it does
-- Builds contexts for every airport/movement (A/D) for each day from today back to `days_back`.
-- Adds metadata fields (`x_fetched_at`, `x_airport_iata`, `x_movtp`, `x_date`) to every record and keeps all source fields (`additionalProperties: true`).
-- Uses header `Key` authentication plus `Origin`, `User-Agent`, and optional `Accept-Language`.
+- Builds partitions for every airport + movement (A/D) for each day from today back to `days_back`.
+- Adds metadata (`x_fetched_at`, `x_airport_iata`, `x_movtp`, `x_date`) while keeping all source fields (`additionalProperties: true`).
+- Authenticates via header `Key` plus `Origin`, `User-Agent`, and optional `Accept-Language`.
+- Emits a single stream: `aerolineas_all_flights`.
 
-## Prereqs
-- Python 3.10+
-- [uv](https://docs.astral.sh/uv/) installed (recommended) **or** a virtualenv + pip
+```
+API (/all-flights) → tap-airlines-arg → Singer target → Warehouse / files
+```
 
-## Install
-With uv (recommended):
+## Quickstart
+
+One flow for both CLI and Meltano users:
+
 ```bash
+# 1) Install (uv keeps deps pinned)
 uv sync
-```
 
-With pip (when published on PyPI):
-```bash
-pip install tap-airlines-arg
-```
+# 2) Minimal config (defaults are public; override api_key if you have a private one)
+cat > config.local.json <<'EOF'
+{
+  "api_url": "https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa",
+  "api_key": "HieGcY2nFreIsNLuo5EbXCwE7g0aRzTN",
+  "airports": ["AEP", "EZE"],
+  "days_back": 1,
+  "origin": "https://www.aeropuertosargentina.com",
+  "user_agent": "Mozilla/5.0",
+  "language": "es-AR"
+}
+EOF
 
-From the repo (adjust URL if it changes):
-```bash
-pip install git+https://github.com/blueprintdata/tap-airlines-arg.git
-# or editable local
-pip install -e .
-```
+# 3) Run the tap end-to-end (emits JSONL)
+uv run tap-airlines-arg --config config.local.json --test=records > output/aerolineas_all_flights.jsonl
 
-## Quickstart (CLI tap)
-
-```bash
-uv sync
-# Optional: cp .env.example .env to override defaults.
-
-# Use public defaults or your overrides (passing --config=ENV reads .env)
-uv run tap-airlines-arg --config ENV --about
-uv run tap-airlines-arg --config ENV --discover
-uv run tap-airlines-arg --config ENV --test=schema
-uv run tap-airlines-arg --config ENV --test=records
-
-# Quick E2E (emits records with public defaults)
-uv run tap-airlines-arg --config ENV --test=records > output/sample.jsonl
-```
-
-### Date window and airports
-- `days_back`: number of days backwards from today (UTC). `0` = only today; `3` = today + previous 3 days.
-- `airports`: JSON array of IATA codes. Strings like `"AEP,EZE"` are normalized, but prefer `["AEP","EZE"]`.
-
-## Configuration
-
-- `api_url` (string, required): Base URL without `/all-flights`. Default `https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa`.
-- `api_key` (string, required): Header `Key`. Public default `HieGcY2nFreIsNLuo5EbXCwE7g0aRzTN`.
-- `origin` (string, optional): `Origin` header. Default `https://www.aeropuertosargentina.com`.
-- `airports` (array[string], required): IATA codes, e.g. `["AEP","EZE"]`. Default `["AEP","EZE"]`.
-- `days_back` (int, optional): Days back from today (inclusive). Default `1`. Users can change this via Meltano or env.
-- `user_agent` (string, optional): `User-Agent` header. Default `Mozilla/5.0`.
-- `language` (string, optional): `Accept-Language` header. Default `es-AR`.
-
-Notes:
-- `.env` is optional: the tap reads `.env` only when you pass `--config=ENV`. Variables: `TAP_AIRLINES_<SETTING>`.
-- Defaults are embedded in code (public API). If you need private credentials, override `api_key`.
-
-## Meltano (dev)
-
-```bash
-# Discover catalog and validate schema/records
-uv run meltano --environment dev invoke tap-airlines-arg --discover
-uv run meltano --environment dev invoke tap-airlines-arg --test=schema
-uv run meltano --environment dev invoke tap-airlines-arg --test=records
-
-# Full pipeline to target-jsonl
+# (Optional) Same config via Meltano with target-jsonl
 uv run meltano --environment dev run tap-airlines-arg target-jsonl
 ```
 
-`meltano.yml` already includes public defaults (including `api_key`). Adjust `days_back`, `airports`, or other values via `meltano config set` or environment variables.
+## Configuration
 
-If `uv run` complains about cache permissions, use `UV_CACHE_DIR=.uv-cache uv run ...` or run Meltano from an environment with write access to `~/.cache/uv`.
+| Parameter    |       Type     |                            Default                              |     Description       |
+| ---          | ---            |           ---                                                   |           ---         |
+| `api_url`    | string   |`https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa`| Base URL`/all-flights`|
+| `api_key`    | string         | `HieGcY2nFreIsNLuo5EbXCwE7g0aRzTN`                              | Header `Key` value.   |
+| `origin`     | string         | `https://www.aeropuertosargentina.com`                          | header sent to the API|
+| `airports`   | array[string]  |`["AEP","EZE"]`                               | IATA codes to query. JSON array preferred|
+| `days_back`  | integer        |      `1`                      | Days back from today (UTC, inclusive). `0` = only today.|
+| `user_agent` | string         | `Mozilla/5.0`                                                    | `User-Agent` header. |
+| `language`   | string         | `es-AR`                                                      | `Accept-Language` header.|
 
-## Generate/refresh schema
+Tips:
+- Config keys map to env vars when using `--config=ENV` (e.g., `TAP_AIRLINES_API_KEY`, `TAP_AIRLINES_AIRPORTS`).
+- Keep `days_back` small for frequent runs; increase only for backfills.
 
-The schema lives in `tap_airlines/schemas/aerolineas_all_flights.json` and keeps `additionalProperties: true`. To refresh it from live data:
+## Use cases
+- Daily sync of arrivals/departures for one or more airports into a warehouse.
+- Historical backfill for a short window (e.g., last 7–14 days) to analyze delays or cancellations.
+- Lightweight monitoring pipeline that forwards fresh records to a downstream alerting system via a Singer target.
 
-```bash
-TAP_AIRLINES_API_KEY=xxx \
-TAP_AIRLINES_API_URL=https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa \
-TAP_AIRLINES_AIRPORTS='["AEP"]' \
-uv run python scripts/generate_schema.py
-```
+## Data schema
+- Core fields include schedule/estimate times (`stda`, `etda`, `atda`), flight identifiers (`id`, `nro`, `idaerolinea`, `aerolinea`), movement (`mov`), status, gate/sector/belt, aircraft info, and weather snippets.
+- Metadata appended by the tap: `x_fetched_at`, `x_airport_iata`, `x_movtp`, `x_date`.
+- Full schema: `tap_airlines/schemas/aerolineas_all_flights.json` (kept flexible with `additionalProperties: true`).
 
-The script writes a normalized schema and ensures metadata fields are present.
+## Performance
+- The endpoint is single-page; expect tens to a few hundred records per airport/day. Typical default run (AEP+EZE, `days_back=1`) stays fast on a laptop.
+- Throughput is target-dependent; the tap overhead is minimal and comfortably handles hundreds of records per second.
+- Recommended `days_back`: 0–3 for routine jobs, up to 14 for backfills. Beyond that, consider chunking runs to avoid large date spans.
 
 ## Troubleshooting
+- **Invalid airports format**: must be JSON array (e.g., `["AEP","EZE"]`). Strings like `"AEP,EZE"` are normalized, but empty arrays fail validation. Fix the config and rerun.
+- **API authentication failures**: `401/403` responses mean the `Key` header is missing or invalid. Verify `api_key`, `Origin`, and `User-Agent` match the API expectations.
+- **Rate limiting**: `429` with retry headers. The tap retries automatically; keep `days_back` small and avoid rapid re-runs. Back off and retry later if limits persist.
+- **Empty responses**: typically happens when the airport/movement/date has no flights or dates are out of range. Check `days_back`, confirm the airport code, and inspect logs for the requested `airport/movtp/date`.
 
-- **Invalid `airports`**: must be a JSON array (e.g. `["AEP","EZE"]`). Empty values fail validation.
-- **Missing fields / warnings**: schema allows extras, but if new fields appear, rerun `scripts/generate_schema.py`.
-- **Stale catalog**: if Meltano ignores schema updates, remove `.meltano/run/tap-airlines-arg/tap.properties.json`.
-- **Structured logging**: requests log `airport/movtp/date` for traceability.
-
-## Development and tests
-
-```bash
-uv run pytest
-uv run tap-airlines-arg --help
-uv run tap-airlines-arg --discover --config ENV
-
-# Local runner without uv (if you already have a venv): ./.venv/bin/tap-airlines-arg --config ENV --test=records
-```
-
-Python 3.10+ is supported. Follow `AGENTS.md` for contribution guidelines.
-
-## Release name
-- Package: `tap-airlines-arg`
-- Wheel: `tap_airlines_arg-<version>-py3-none-any.whl`
-- CLI: `tap-airlines-arg`
+## Contributing
+Short changes are welcome. Please keep schemas in sync, add/update tests when touching logic, and follow the developer notes in `AGENTS.md`. Open issues or PRs if anything is unclear.
