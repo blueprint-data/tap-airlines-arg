@@ -1,272 +1,180 @@
 # AGENTS.md - AI Agent Development Guide for tap-airlines-arg
 
-This document provides guidance for AI coding agents and developers working on this Singer tap.
+Guidance for contributors and AI agents working on this Singer tap.
 
 ## Project Overview
 
-- **Project Type**: Singer Tap
-- **Source**: blueprintdata
-- **Stream Type**: REST
-- **Authentication**: API Key
-- **Framework**: Meltano Singer SDK
+- **Type**: Singer Tap (Meltano Singer SDK)
+- **Source**: blueprintdata / Airports Argentina `/all-flights`
+- **Auth**: API Key (header `Key`)
+- **Streams**: REST, single stream today (`aerolineas_all_flights`)
 
-## Architecture
+## Request Flow Diagram
 
-This tap follows the Singer specification and uses the Meltano Singer SDK to extract data from blueprintdata.
-
-### Key Components
-
-1. **Tap Class** (`tap_airlines/tap.py`): Main entry point, defines streams and configuration
-1. **Client** (`tap_airlines/client.py`): Handles API communication and authentication
-1. **Streams** (`tap_airlines/streams.py`): Define data streams and their schemas
-   ## Development Guidelines for AI Agents
-
-### Understanding Singer Concepts
-
-Before making changes, ensure you understand these Singer concepts:
-
-- **Streams**: Individual data endpoints (e.g., users, orders, transactions)
-- **State**: Tracks incremental sync progress using bookmarks
-- **Catalog**: Metadata about available streams and their schemas
-- **Records**: Individual data items emitted by the tap
-- **Schemas**: JSON Schema definitions for stream data
-
-### Common Tasks
-
-#### Adding a New Stream
-
-1. Define stream class in `tap_airlines/streams.py`
-1. Set `name`, `path`, `primary_keys`, and `replication_key` (set this to `None` if not applicable)
-1. Define schema using `PropertiesList` or JSON Schema
-1. Register stream in the tap's `discover_streams()` method
-
-Example:
-
-```python
-class MyNewStream(BlueprintdataStream):
-    name = "my_new_stream"
-    path = "/api/v1/my_resource"
-    primary_keys = ["id"]
-    replication_key = "updated_at"
-
-    schema = PropertiesList(
-        Property("id", StringType, required=True),
-        Property("name", StringType),
-        Property("updated_at", DateTimeType),
-    ).to_dict()
+```
+Config → Build Partitions → For each (airport, movtp, date) → API Request → Parse → Enrich → Emit Record
 ```
 
-#### Modifying Authentication
+## Understanding Partitions
 
-- Update `authenticator` in client class
-- API key should be passed via headers or query parameters
-- Configuration defined in `tap.py` config schema
-  #### Handling Pagination
+- Defined in `AerolineasAllFlightsStream._build_partitions` (`tap_airlines/streams.py`).
+- Dimensions: `airport_iata` (config), `movtp` in `("A","D")`, `date` for each day from `today` back to `days_back` (inclusive, UTC).
+- Partitions are cached per run (`self._partitions`), so changes to `days_back` or `airports` require re-instantiation.
 
-The SDK provides built-in pagination classes. **Use these instead of overriding `get_next_page_token()` directly.**
+## Real API Response Example (/all-flights)
 
-**Built-in Paginator Classes:**
+Representative JSON shape (truncated fields):
 
-1. **SimpleHeaderPaginator**: For APIs using Link headers (RFC 5988)
-
-   ```python
-   from singer_sdk.pagination import SimpleHeaderPaginator
-
-   class MyStream(BlueprintdataStream):
-       def get_new_paginator(self):
-           return SimpleHeaderPaginator()
-   ```
-
-1. **HeaderLinkPaginator**: For APIs with `Link: <url>; rel="next"` headers
-
-   ```python
-   from singer_sdk.pagination import HeaderLinkPaginator
-
-   class MyStream(BlueprintdataStream):
-       def get_new_paginator(self):
-           return HeaderLinkPaginator()
-   ```
-
-1. **JSONPathPaginator**: For cursor/token in response body
-
-   ```python
-   from singer_sdk.pagination import JSONPathPaginator
-
-   class MyStream(BlueprintdataStream):
-       def get_new_paginator(self):
-           return JSONPathPaginator("$.pagination.next_token")
-   ```
-
-1. **SinglePagePaginator**: For non-paginated endpoints
-
-   ```python
-   from singer_sdk.pagination import SinglePagePaginator
-
-   class MyStream(BlueprintdataStream):
-       def get_new_paginator(self):
-           return SinglePagePaginator()
-   ```
-
-**Creating Custom Paginators:**
-
-For complex pagination logic, create a custom paginator class:
-
-```python
-from singer_sdk.pagination import BasePageNumberPaginator
-
-class MyCustomPaginator(BasePageNumberPaginator):
-    def has_more(self, response):
-        """Check if there are more pages."""
-        data = response.json()
-        return data.get("has_more", False)
-
-    def get_next_url(self, response):
-        """Get the next page URL."""
-        data = response.json()
-        if self.has_more(response):
-            return data.get("next_url")
-        return None
-
-# Use in stream
-class MyStream(BlueprintdataStream):
-    def get_new_paginator(self):
-        return MyCustomPaginator(start_value=1)
+```json
+{
+  "id": "7839435",
+  "stda": "2024-01-05T12:30:00Z",
+  "arpt": "AEP",
+  "idaerolinea": "AR",
+  "aerolinea": "Aerolíneas Argentinas",
+  "mov": "A",
+  "nro": "AR1502",
+  "status": "Land",
+  "destorig": "MDZ",
+  "IATAdestorig": "MDZ",
+  "etda": "2024-01-05T12:35:00Z",
+  "sector": "A",
+  "termsec": "A",
+  "gate": "15",
+  "belt": "3",
+  "sdtempunit": "C",
+  "sdtemp": "23",
+  "sdphrase": "Parcialmente nublado",
+  "acftype": "73H",
+  "blockon": null,
+  "blockoff": null,
+  "x_fetched_at": "2024-01-05T12:33:12Z",
+  "x_airport_iata": "AEP",
+  "x_movtp": "A",
+  "x_date": "2024-01-05"
+}
 ```
 
-**Common Pagination Patterns:**
+Fields may vary; the tap keeps `additionalProperties: true`.
 
-- **Offset-based**: Extend `BaseOffsetPaginator`
-- **Page-based**: Extend `BasePageNumberPaginator`
-- **Cursor-based**: Extend `BaseAPIPaginator` with custom logic
-- **HATEOAS/HAL**: Use `JSONPathPaginator` with appropriate JSON path
+## Common Development Tasks
 
-Only override `get_next_page_token()` as a last resort for very simple cases.
+**Test a single partition/context**
+- Narrow inputs to reduce contexts: set `airports=["AEP"]` and `days_back=0` in config.
+- For a true single-context check, run a Python snippet:
+  ```bash
+  python3 - <<'PY'
+  from tap_airlines.tap import TapAirlines
+  tap = TapAirlines(config={
+      "api_url": "https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa",
+      "api_key": "HieGcY2nFreIsNLuo5EbXCwE7g0aRzTN",
+      "airports": ["AEP"],
+      "days_back": 0,
+  })
+  stream = tap.discover_streams()[0]
+  ctx = stream.partitions[0]
+  records = list(stream.get_records(context=ctx))
+  print(ctx, len(records))
+  PY
+  ```
 
-#### State and Incremental Sync
+**Debug API requests**
+- Run with detailed logs: `LOGLEVEL=DEBUG uv run tap-airlines-arg --config config.json --test=records`.
+- Each request logs `airport/movtp/date`. Inspect HTTP status or retry info in the debug output.
 
-- Set `replication_key` to enable incremental sync (e.g., "updated_at")
-- Override `get_starting_timestamp()` to set initial sync point
-- State automatically managed by SDK
-- Access current state via `get_context_state()`
+**Add a new metadata field**
+- Add to `post_process` in `tap_airlines/streams.py` and update the JSON schema (`tap_airlines/schemas/aerolineas_all_flights.json` or regen via `scripts/generate_schema.py`).
+- Include the field in tests (`tests/test_streams.py`) to prevent regressions.
 
-#### Schema Evolution
+**Modify date range logic**
+- Edit `_build_partitions` to change the date window or movements. Keep `days_back` non-negative (`coerce_days_back`).
+- If adding start/end dates, normalize to UTC and update tests around partition counts.
 
-- Use flexible schemas during development
-- Add new properties without breaking changes
-- Consider making fields optional when unsure
-- Use `th.Property("field", th.StringType)` for basic types
-- Nest objects with `th.ObjectType(...)`
-
-### Testing
-
-Run tests to verify your changes:
-
-```bash
-# Install dependencies
-uv sync
-
-# Run all tests
-uv run pytest
-
-# Run specific test
-uv run pytest tests/test_core.py -k test_name
-```
-
-### Configuration
-
-Configuration properties are defined in the tap class:
-
-- Required vs optional properties
-- Secret properties (passwords, tokens)
-- Mark sensitive data with `secret=True` parameter
-- Defaults specified in config schema
-
-Example configuration schema:
+## Adding a New Stream (complete example)
 
 ```python
 from singer_sdk import typing as th
+from tap_airlines.client import BlueprintdataStream
 
-config_jsonschema = th.PropertiesList(
-    th.Property("api_url", th.StringType, required=True),
-    th.Property("api_key", th.StringType, required=True, secret=True),
-    th.Property("start_date", th.DateTimeType),
-    th.Property("user_agent", th.StringType, default="tap-mysource"),
-).to_dict()
+
+class MyNewStream(BlueprintdataStream):
+    name = "my_new_stream"
+    path = "/api/v1/my_resource"
+    primary_keys = ("id",)
+    replication_key = None
+
+    schema = th.PropertiesList(
+        th.Property("id", th.StringType, required=True),
+        th.Property("name", th.StringType),
+        th.Property("updated_at", th.DateTimeType),
+    ).to_dict()
+
+    # Optional: pagination if the endpoint pages
+    # def get_new_paginator(self):
+    #     return JSONPathPaginator("$.next")
 ```
 
-Example test with config:
+Register it in `TapAirlines.discover_streams`:
 
-```bash
-tap-airlines-arg --config config.json --discover
-tap-airlines-arg --config config.json --catalog catalog.json
+```python
+def discover_streams(self):
+    return [
+        streams.AerolineasAllFlightsStream(self),
+        streams.MyNewStream(self),
+    ]
 ```
 
-### Common Pitfalls
+## Pagination for this API
 
-1. **Rate Limiting**: Implement backoff using `RESTStream` built-in retry logic
-1. **Large Responses**: Use pagination, don't load entire dataset into memory
-1. **Schema Mismatches**: Validate data matches schema, handle null values
-1. **State Management**: Don't modify state directly, use SDK methods
-1. **Timezone Handling**: Use UTC, parse ISO 8601 datetime strings
-1. **Error Handling**: Let SDK handle retries, log warnings for data issues
+- `/all-flights` is single-page; `BlueprintdataStream.get_new_paginator` returns `None`.
+- If a new endpoint needs pagination, prefer SDK paginators:
+  ```python
+  from singer_sdk.pagination import SinglePagePaginator
+  def get_new_paginator(self):
+      return SinglePagePaginator()
+  ```
+  Swap in `HeaderLinkPaginator`, `SimpleHeaderPaginator`, or `JSONPathPaginator` as needed.
 
-### SDK Resources
+## State and Incremental Sync
 
-- [Singer SDK Documentation](https://sdk.meltano.com)
-- [Singer Spec](https://hub.meltano.com/singer/spec)
-- [SDK Reference](https://sdk.meltano.com/en/latest/reference.html)
-- [Stream Maps](https://sdk.meltano.com/en/latest/stream_maps.html)
+- Current stream is full-table per partition (no `replication_key`).
+- State is still emitted so downstream targets can store it; if you add incremental behavior, set `replication_key` and rely on SDK state handling.
 
-### Best Practices
+## Testing
 
-1. **Logging**: Use `self.logger` for structured logging
-1. **Validation**: Validate API responses before emitting records
-1. **Documentation**: Update README with new streams and config options
-1. **Type Hints**: Add type hints to improve code clarity
-1. **Testing**: Write tests for new streams and edge cases
-1. **Performance**: Profile slow streams, optimize API calls
-1. **Error Messages**: Provide clear, actionable error messages
+- Install deps: `uv sync`
+- Full suite: `uv run pytest`
+- Targeted test: `uv run pytest tests/test_streams.py -k partitions`
+
+## Configuration Reference (dev view)
+
+Defined in `tap_airlines/tap.py` with defaults in `tap_airlines/utils.py`. Env var pattern: `TAP_AIRLINES_<UPPER_KEY>`.
+
+## Best Practices
+
+- Log with context (`airport`, `movtp`, `date`) for traceability.
+- Keep schemas permissive but update when adding metadata.
+- Avoid direct state mutations; let the SDK handle it.
+- Add type hints and tests for new logic.
 
 ## File Structure
 
 ```
 tap-airlines-arg/
 ├── tap_airlines/
-│   ├── __init__.py
 │   ├── tap.py          # Main tap class
-│   ├── client.py       # API client
-│   └── streams.py      # Stream definitions
+│   ├── client.py       # API client + auth/headers
+│   ├── streams.py      # Stream definitions, partitions, post-process
+│   └── schemas/        # JSON schemas
+├── scripts/generate_schema.py
 ├── tests/
-│   ├── __init__.py
-│   └── test_core.py
-├── config.json         # Example configuration
-├── pyproject.toml      # Dependencies and metadata
-└── README.md          # User documentation
+└── README.md, AGENTS.md
 ```
 
 ## Additional Resources
 
-- Project README: See `README.md` for setup and usage
+- User docs: `README.md`
+- Config reference: `CONFIGURATION.md`
+- Quickstart: `QUICKSTART.md`
 - Singer SDK: https://sdk.meltano.com
-- Meltano: https://meltano.com
-- Singer Specification: https://hub.meltano.com/singer/spec
-
-## Making Changes
-
-When implementing changes:
-
-1. Understand the existing code structure
-1. Follow Singer and SDK patterns
-1. Test thoroughly with real API credentials
-1. Update documentation and docstrings
-1. Ensure backward compatibility when possible
-1. Run linting and type checking
-
-## Questions?
-
-If you're uncertain about an implementation:
-
-- Check SDK documentation for similar examples
-- Review other Singer taps for patterns
-- Test incrementally with small changes
-- Validate against the Singer specification
+- Singer Spec: https://hub.meltano.com/singer/spec
