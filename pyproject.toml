@@ -1,5 +1,5 @@
 [project]
-name = "tap-airlines"
+name = "tap-airlines-arg"
 version = "1.0.0"
 description = "Singer tap for blueprintdata, built with the Meltano Singer SDK."
 readme = "README.md"
@@ -33,7 +33,7 @@ s3 = [
 
 [project.scripts]
 # CLI declaration
-tap-airlines = 'tap_airlines.tap:TapAirlines.cli'
+tap-airlines-arg = 'tap_airlines.tap:TapAirlines.cli'
 
 [dependency-groups]
 dev = [
@@ -95,6 +95,9 @@ allow-star-arg-any = true
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tap_airlines"]
 
 [build-system]
 requires = [

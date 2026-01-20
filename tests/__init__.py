@@ -1,1 +1,1 @@
-"""Test suite for tap-airlines."""
+"""Test suite for tap-airlines-arg."""

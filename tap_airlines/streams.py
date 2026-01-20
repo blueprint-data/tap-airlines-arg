@@ -1,4 +1,4 @@
-"""Stream type classes for tap-airlines."""
+"""Stream type classes for tap-airlines-arg."""
 
 from __future__ import annotations
 

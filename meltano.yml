@@ -1,5 +1,5 @@
 send_anonymous_usage_stats: true
-project_id: tap-airlines
+project_id: tap-airlines-arg
 requires_meltano: '>=4.0'
 
 default_environment: dev
@@ -10,10 +10,10 @@ environments:
 
 plugins:
   extractors:
-  - name: tap-airlines
+  - name: tap-airlines-arg
     namespace: tap_airlines
     pip_url: -e .
-    executable: tap-airlines
+    executable: tap-airlines-arg
     capabilities:
     - state
     - catalog
@@ -61,6 +61,7 @@ plugins:
 
       # Defaults no-sensibles (OK en git)
     config:
+      api_key: HieGcY2nFreIsNLuo5EbXCwE7g0aRzTN
       api_url: https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa
       origin: https://www.aeropuertosargentina.com
       language: es-AR

@@ -1536,7 +1536,7 @@ wheels = [
 ]
 
 [[package]]
-name = "tap-airlines"
+name = "tap-airlines-arg"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
