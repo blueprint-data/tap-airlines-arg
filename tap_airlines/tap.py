@@ -99,6 +99,22 @@ class TapAirlines(Tap):
             title="Language",
             description="Header Accept-Language (default es-AR).",
         ),
+        th.Property(
+            "requests_per_batch",
+            th.IntegerType(nullable=True),
+            required=False,
+            default=30,
+            title="Requests Per Batch",
+            description="Number of requests to make before pausing (for rate limiting).",
+        ),
+        th.Property(
+            "batch_delay_seconds",
+            th.NumberType(nullable=True),
+            required=False,
+            default=1.0,
+            title="Batch Delay",
+            description="Seconds to wait after completing a batch of requests.",
+        ),
     ).to_dict()
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

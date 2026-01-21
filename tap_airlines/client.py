@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import decimal
 import sys
+import time
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
@@ -39,6 +40,32 @@ class BlueprintdataStream(RESTStream):
 
     records_jsonpath = "$[*]"
     extra_retry_statuses = (429, 500, 502, 503, 504)
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize with request counter for batch rate limiting."""
+        super().__init__(*args, **kwargs)
+        self._request_count = 0
+
+    @override
+    def _request(
+        self,
+        prepared_request: requests.PreparedRequest,
+        context: Context | None,
+    ) -> requests.Response:
+        """Add delay after every N requests if configured."""
+        self._request_count += 1
+
+        requests_per_batch = self.config.get("requests_per_batch", 30)
+        batch_delay = self.config.get("batch_delay_seconds", 1.0)
+
+        if requests_per_batch > 0 and self._request_count % requests_per_batch == 0:
+            self.logger.info(
+                f"Completed {self._request_count} requests. "
+                f"Pausing for {batch_delay} seconds..."
+            )
+            time.sleep(batch_delay)
+
+        return super()._request(prepared_request, context)
 
     @cached_property
     def airports(self) -> list[str]:

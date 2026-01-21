@@ -59,6 +59,16 @@ plugins:
       label: User Agent
       description: Header User-Agent.
 
+    - name: requests_per_batch
+      kind: integer
+      label: Requests Per Batch
+      description: Number of requests before pausing for rate limiting. Set to 0 to disable.
+
+    - name: batch_delay_seconds
+      kind: number
+      label: Batch Delay Seconds
+      description: Seconds to wait after completing each batch of requests.
+
       # Defaults no-sensibles (OK en git)
     config:
       api_key: HieGcY2nFreIsNLuo5EbXCwE7g0aRzTN

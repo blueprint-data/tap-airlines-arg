@@ -16,6 +16,8 @@
 | `origin`   | string | `Origin` header sent to the API.  | `https://www.aeropuertosargentina.com` |
 |`user_agent`| string | `User-Agent` header.              | `Mozilla/5.0`                          |
 | `language` | string | `Accept-Language` header.         | `es-AR`                                |
+|`requests_per_batch`| integer | Number of requests before pausing for rate limiting. Set to `0` to disable. | `30` |
+|`batch_delay_seconds`| number | Seconds to wait after completing each batch of requests. | `1.0` |
 
 ## Configuration Examples
 
@@ -52,6 +54,18 @@
 }
 ```
 
+### Large Backfill with Rate Limiting
+```json
+{
+  "api_url": "https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa",
+  "api_key": "HieGcY2nFreIsNLuo5EbXCwE7g0aRzTN",
+  "airports": ["AEP", "EZE", "COR"],
+  "days_back": 14,
+  "requests_per_batch": 50,
+  "batch_delay_seconds": 2.0
+}
+```
+
 ## Environment Variables
 
 | Config key  |      Env var            |
@@ -63,6 +77,8 @@
 | `origin`    |`TAP_AIRLINES_ORIGIN`.   |
 | `user_agent`|`TAP_AIRLINES_USER_AGENT`|
 | `language`  |`TAP_AIRLINES_LANGUAGE`  |
+| `requests_per_batch`|`TAP_AIRLINES_REQUESTS_PER_BATCH`|
+| `batch_delay_seconds`|`TAP_AIRLINES_BATCH_DELAY_SECONDS`|
 
 ## Meltano-specific Configuration
 

@@ -68,10 +68,13 @@ uv run meltano --environment dev run tap-airlines-arg target-jsonl
 | `days_back`  | integer        |      `1`                      | Days back from today (UTC, inclusive). `0` = only today.|
 | `user_agent` | string         | `Mozilla/5.0`                                                    | `User-Agent` header. |
 | `language`   | string         | `es-AR`                                                      | `Accept-Language` header.|
+| `requests_per_batch` | integer | `30` | Number of requests before pausing for rate limiting. Set to `0` to disable.|
+| `batch_delay_seconds` | number | `1.0` | Seconds to wait after completing each batch of requests.|
 
 Tips:
 - Config keys map to env vars when using `--config=ENV` (e.g., `TAP_AIRLINES_API_KEY`, `TAP_AIRLINES_AIRPORTS`).
 - Keep `days_back` small for frequent runs; increase only for backfills.
+- Use `requests_per_batch` and `batch_delay_seconds` to avoid rate limits when processing many partitions.
 
 ## Use cases
 - Daily sync of arrivals/departures for one or more airports into a warehouse.
@@ -91,7 +94,7 @@ Tips:
 ## Troubleshooting
 - **Invalid airports format**: must be JSON array (e.g., `["AEP","EZE"]`). Strings like `"AEP,EZE"` are normalized, but empty arrays fail validation. Fix the config and rerun.
 - **API authentication failures**: `401/403` responses mean the `Key` header is missing or invalid. Verify `api_key`, `Origin`, and `User-Agent` match the API expectations.
-- **Rate limiting**: `429` with retry headers. The tap retries automatically; keep `days_back` small and avoid rapid re-runs. Back off and retry later if limits persist.
+- **Rate limiting**: `429` with retry headers. The tap retries automatically; keep `days_back` small and avoid rapid re-runs. To proactively avoid rate limits, configure `requests_per_batch` and `batch_delay_seconds` to add pauses between batches of requests.
 - **Empty responses**: typically happens when the airport/movement/date has no flights or dates are out of range. Check `days_back`, confirm the airport code, and inspect logs for the requested `airport/movtp/date`.
 
 ## Contributing
